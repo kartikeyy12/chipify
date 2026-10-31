@@ -1,0 +1,18 @@
+# --- Core DSP ---
+numpy>=1.26
+scipy>=1.11
+librosa>=0.10.2        # HPSS, pYIN, onset detection, STFT
+soundfile>=0.12.1      # WAV/FLAC/(MP3 via libsndfile>=1.1) I/O
+numba>=0.59            # librosa JIT backend
+
+# --- Visualization (headless; used with the Agg backend) ---
+matplotlib>=3.8
+
+# --- MIDI export ---
+mido>=1.3
+
+# --- Web UI ---
+gradio>=5.0
+
+# --- Testing ---
+pytest>=8.0

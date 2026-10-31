@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+outputs/*
+!outputs/.gitkeep
+.numba_cache/
+.ipynb_checkpoints/
+assets/samples/*
+!assets/samples/.gitkeep
