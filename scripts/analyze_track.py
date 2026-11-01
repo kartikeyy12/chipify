@@ -25,26 +25,17 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import matplotlib  # noqa: E402
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 from chipify import config  # noqa: E402
 from chipify.audio_decoder import AudioError, load_audio, write_wav  # noqa: E402
 from chipify.chip_tables import hz_to_midi  # noqa: E402
 from chipify.pitch_tracker import (  # noqa: E402
-    HARMONY_MODES, PITCH_CLASS_NAMES, AnalysisSettings, NoteEvent, TrackAnalysis, analyze,
+    HARMONY_MODES, AnalysisSettings, NoteEvent, TrackAnalysis, analyze,
 )
+from chipify.visualizer import note_name, plot_piano_roll, save_figure  # noqa: E402
 
 PREVIEW_SR = 44_100
-CHANNEL_COLORS = {"pulse1": "#d62728", "pulse2": "#ff9f1c", "triangle": "#1f77b4"}
-DRUM_COLORS = {"kick": "#2ca02c", "snare": "#9467bd", "hat": "#7f7f7f"}
-
-
-def note_name(midi_note: int) -> str:
-    return f"{PITCH_CLASS_NAMES[midi_note % 12]}{midi_note // 12 - 1}"
 
 
 # --------------------------------------------------------------------------- #
@@ -93,52 +84,6 @@ def render_preview(a: TrackAnalysis, sr: int = PREVIEW_SR) -> np.ndarray:
     if peak > 0:
         out *= 0.9 / peak
     return out.astype(np.float32)
-
-
-# --------------------------------------------------------------------------- #
-# Piano-roll plot
-# --------------------------------------------------------------------------- #
-def plot_piano_roll(a: TrackAnalysis, path: Path, start_s: float, window_s: float) -> None:
-    end_s = min(a.duration_s, start_s + window_s)
-    all_notes: list[NoteEvent] = [*a.lead, *a.harmony, *a.bass]
-    in_view = [n for n in all_notes if n.end_s >= start_s and n.start_s <= end_s]
-    lo = min((n.midi_note for n in in_view), default=36) - 6
-    hi = max((n.midi_note for n in in_view), default=84) + 3
-
-    fig, ax = plt.subplots(figsize=(15, 6.5), dpi=110)
-
-    if (end_s - start_s) <= 40:                              # faint rhythm grid
-        k0 = int(np.floor((start_s - a.grid_offset_s) / a.grid_step_s))
-        k1 = int(np.ceil((end_s - a.grid_offset_s) / a.grid_step_s))
-        ax.vlines([a.grid_offset_s + k * a.grid_step_s for k in range(k0, k1 + 1)],
-                  lo, hi, colors="#bbbbbb", linewidth=0.4, zorder=0)
-
-    for n in in_view:
-        ax.barh(n.midi_note, n.duration_s, left=n.start_s, height=0.8,
-                color=CHANNEL_COLORS[n.channel], alpha=0.35 + 0.65 * n.velocity, zorder=2)
-
-    for hz in (a.f0_lead_hz, a.f0_bass_hz):                  # raw tracker output
-        ax.plot(a.f0_times, hz_to_midi(hz), ".", color="black", markersize=1.6, alpha=0.4, zorder=3)
-
-    for d in a.drums:
-        if start_s <= d.time_s <= end_s:
-            ax.vlines(d.time_s, lo, lo + 2.5, colors=DRUM_COLORS[d.kind], linewidth=1.6, zorder=2)
-
-    ticks = list(range(int(lo) - int(lo) % 12 + 12, int(hi) + 1, 12))
-    ax.set_yticks(ticks, [note_name(t) for t in ticks])
-    ax.set_xlim(start_s, end_s)
-    ax.set_ylim(lo, hi)
-    ax.set_xlabel("time (s)")
-    ax.set_title(
-        f"{a.bpm:.1f} BPM ({a.bpm_source}) | key {a.key or '?'} | grid fit {a.grid_fit:.2f} | "
-        "black dots = raw pYIN pitch, bars = quantised chip notes, bottom ticks = drums"
-    )
-    handles = [plt.Line2D([0], [0], color=c, lw=6, label=k) for k, c in CHANNEL_COLORS.items()]
-    handles += [plt.Line2D([0], [0], color=c, lw=2, label=k) for k, c in DRUM_COLORS.items()]
-    ax.legend(handles=handles, loc="upper right", ncol=6, fontsize=8)
-    fig.tight_layout()
-    fig.savefig(path)
-    plt.close(fig)
 
 
 # --------------------------------------------------------------------------- #
@@ -229,7 +174,7 @@ def main(argv: list[str]) -> int:
     stem = Path(args.path).stem
     png = config.new_output_path(f"{stem}_notes", ".png")
     wav = config.new_output_path(f"{stem}_phase3_preview", ".wav")
-    plot_piano_roll(result, png, args.plot_start, args.plot_seconds)
+    save_figure(plot_piano_roll(result, args.plot_start, args.plot_seconds), png)
     write_wav(wav, render_preview(result), PREVIEW_SR)
     print(f"\npiano roll : {png}")
     print(f"preview wav: {wav}")
